@@ -1,0 +1,8 @@
+redis==5.0.1
+weaviate-client==3.25.3
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+sentence-transformers==2.2.2
+numpy==1.24.3
+python-dotenv==1.0.0
+structlog==23.2.0

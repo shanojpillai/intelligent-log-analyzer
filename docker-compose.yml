@@ -1,0 +1,239 @@
+version: '3.8'
+
+services:
+  # Frontend - Streamlit UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      - backend
+    networks:
+      - log-analyzer-network
+
+  # Backend - FastAPI
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:secure_password_123@postgres:5432/log_analyzer
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - WEAVIATE_URL=http://weaviate:8080
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - weaviate
+      - ollama
+    networks:
+      - log-analyzer-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=log_analyzer
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secure_password_123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - log-analyzer-network
+
+  # Redis Queue
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass redis_password_123
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - log-analyzer-network
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - log-analyzer-network
+
+  # Vector Database - Weaviate
+  weaviate:
+    image: semitechnologies/weaviate:1.21.2
+    ports:
+      - "8080:8080"
+    environment:
+      - QUERY_DEFAULTS_LIMIT=25
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - DEFAULT_VECTORIZER_MODULE=none
+      - ENABLE_MODULES=text2vec-transformers
+      - TRANSFORMERS_INFERENCE_API=http://t2v-transformers:8080
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - log-analyzer-network
+
+  # Transformers for Weaviate
+  t2v-transformers:
+    image: semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    environment:
+      - ENABLE_CUDA=0
+    networks:
+      - log-analyzer-network
+
+  # Ollama for AI Analysis
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    networks:
+      - log-analyzer-network
+
+  # Log Extractor Service
+  log-extractor:
+    build:
+      context: ./services/log-extractor
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - redis
+      - minio
+    networks:
+      - log-analyzer-network
+
+  # Embedding Engine Service
+  embedding-engine:
+    build:
+      context: ./services/embedding-engine
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+      - WEAVIATE_URL=http://weaviate:8080
+    depends_on:
+      - redis
+      - weaviate
+    networks:
+      - log-analyzer-network
+
+  # Retrieval Engine Service
+  retrieval-engine:
+    build:
+      context: ./services/retrieval-engine
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+      - WEAVIATE_URL=http://weaviate:8080
+      - DATABASE_URL=postgresql://postgres:secure_password_123@postgres:5432/log_analyzer
+    depends_on:
+      - redis
+      - weaviate
+      - postgres
+    networks:
+      - log-analyzer-network
+
+  # AI Analyzer Service (Ollama)
+  ai-analyzer:
+    build:
+      context: ./services/ai-analyzer
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=llama2
+    depends_on:
+      - redis
+      - ollama
+    networks:
+      - log-analyzer-network
+
+  # NLU Processor Service (spaCy)
+  nlu-processor:
+    build:
+      context: ./services/nlu-processor
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+    depends_on:
+      - redis
+    networks:
+      - log-analyzer-network
+
+  # Export Service
+  export-service:
+    build:
+      context: ./services/export-service
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://:redis_password_123@redis:6379
+      - DATABASE_URL=postgresql://postgres:secure_password_123@postgres:5432/log_analyzer
+    volumes:
+      - ./data/exports:/app/exports
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - log-analyzer-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - log-analyzer-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  weaviate_data:
+  ollama_data:
+
+networks:
+  log-analyzer-network:
+    driver: bridge

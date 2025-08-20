@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Data directories
+data/uploads/*
+data/extracted/*
+data/exports/*
+data/embeddings/*
+!data/uploads/.gitkeep
+!data/extracted/.gitkeep
+!data/exports/.gitkeep
+!data/embeddings/.gitkeep
+
+# Docker
+.docker/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Redis
+*.rdb
+
+# Local environment files
+.env.local
+.env.*.local

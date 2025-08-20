@@ -1,0 +1,4 @@
+redis==5.0.1
+spacy==3.7.2
+python-dotenv==1.0.0
+structlog==23.2.0
