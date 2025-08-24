@@ -10,7 +10,8 @@ This system implements a comprehensive 14-component architecture for intelligent
 Upload → Extract → Search Past → Get Context → AI Analyze → Show Results → Export
 ```
 
-![Architecture Diagram](docs/architecture-diagram.png)
+<img width="1320" height="1622" alt="image" src="https://github.com/user-attachments/assets/b6c67e60-cb3b-419f-a5cc-30750f478c24" />
+
 
 ## System Components
 
